@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>JSON Browser</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Prism.js for code highlight -->
+    <link href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet"/>
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(120deg, #f0f4f8 0%, #e2eafc 100%);
+            min-height: 100vh;
+        }
+        .json-card {
+            max-width: 1400px;
+            margin: 7vh auto;
+            box-shadow: 0 8px 32px 0 rgba(31,38,135,0.1);
+            border-radius: 20px;
+            background: #fff;
+        }
+        .json-header {
+            border-bottom: 1px solid #e9ecef;
+            padding-bottom: 0.8em;
+        }
+        .prism-code {
+            font-size: 1.05rem;
+            border-radius: 8px;
+            background: #282a36;
+            color: #f8f8f2;
+            padding: 1.2em;
+            white-space: pre;
+            word-break: normal;
+            overflow-x: auto;
+            transition: background 0.2s;
+            tab-size: 2;
+            -moz-tab-size: 2;
+        }
+        /* Change line */
+        .prism-code.wrap,
+        .prism-code.wrap code {
+            white-space: pre-wrap !important;
+            word-break: break-all !important;
+            overflow-x: hidden !important;
+            font-family: 'Fira Mono', 'Consolas', 'Menlo', 'Monaco', 'Liberation Mono', 'Courier New', monospace;
+        }
+        .prism-code.wrap code {
+            unicode-bidi: plaintext;
+        }
+        .prism-code code {
+            tab-size: 2;
+            -moz-tab-size: 2;
+        }
+        .btn-nav {
+            min-width: 100px;
+        }
+        .page-indicator {
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+        .progress {
+            height: 7px;
+            border-radius: 5px;
+        }
+        .btn-link {
+            color: #0d6efd;
+            text-decoration: none;
+        }
+        .btn-link:hover {
+            color: #0a58ca;
+            text-decoration: underline;
+        }
+        .wrap-toggle-btn {
+            min-width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="json-card p-4">
+        <div class="json-header d-flex align-items-center mb-3">
+            <i class="bi bi-braces-asterisk fs-3 me-2 text-primary"></i>
+            <h3 class="mb-0">JSON Browser</h3>
+            <!-- Change line botton -->
+            <button id="wrapToggleBtn" type="button" class="btn btn-outline-primary btn-sm ms-auto wrap-toggle-btn" title="Soft Wraps">
+                <i class="bi bi-text-wrap"></i> Soft Wraps
+            </button>
+        </div>
+        <div>
+            <pre class="prism-code language-json" id="jsonCode"><code class="language-json" id="jsonCodeInner">{{ data }}</code></pre>
+        </div>
+        <div class="my-3">
+            <div class="progress">
+                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ (page/total*100)|round(2) }}%;" aria-valuenow="{{ page }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
+            </div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <a href="/viewer?page={{ page - 1 }}" class="btn btn-outline-secondary btn-nav {% if page == 1 %}disabled{% endif %}">
+                <i class="bi bi-arrow-left"></i> Previous
+            </a>
+            <span class="page-indicator">
+                <i class="bi bi-list-ol"></i>
+                Page {{ page }} / {{ total }} Total
+            </span>
+            <a href="/viewer?page={{ page + 1 }}" class="btn btn-outline-secondary btn-nav {% if page == total %}disabled{% endif %}">
+                Next <i class="bi bi-arrow-right"></i>
+            </a>
+        </div>
+        <div class="mt-3 text-center">
+            <a href="/" class="btn btn-link">
+                <i class="bi bi-arrow-bar-up"></i> Return to upload
+            </a>
+        </div>
+    </div>
+    <!-- Prism.js -->
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+    <script>
+        const wrapToggleBtn = document.getElementById('wrapToggleBtn');
+        const jsonCode = document.getElementById('jsonCode');
+        let isWrapped = false;
+
+        function updateBtn() {
+            if (isWrapped) {
+                wrapToggleBtn.innerHTML = '<i class="bi bi-text-nowrap"></i> Warp off';
+                wrapToggleBtn.classList.remove('btn-outline-primary');
+                wrapToggleBtn.classList.add('btn-primary');
+            } else {
+                wrapToggleBtn.innerHTML = '<i class="bi bi-text-wrap"></i> Warp on';
+                wrapToggleBtn.classList.remove('btn-primary');
+                wrapToggleBtn.classList.add('btn-outline-primary');
+            }
+        }
+
+        wrapToggleBtn.addEventListener('click', function () {
+            isWrapped = !isWrapped;
+            jsonCode.classList.toggle('wrap', isWrapped);
+            updateBtn();
+        });
+
+        updateBtn();
+
+        document.addEventListener('keydown', function (event) {
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
+            return;
+        }
+        // ← Previous page
+        if (event.key === 'ArrowLeft') {
+            const prevBtn = document.querySelector('.btn-nav:not(.disabled)[href*="page={{ page - 1 }}"]');
+            if (prevBtn) prevBtn.click();
+        }
+        // → Next page
+        if (event.key === 'ArrowRight') {
+            const nextBtn = document.querySelector('.btn-nav:not(.disabled)[href*="page={{ page + 1 }}"]');
+            if (nextBtn) nextBtn.click();
+        }
+    });
+    </script>
+</body>
+</html>
