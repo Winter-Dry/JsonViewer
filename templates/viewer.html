@@ -144,7 +144,6 @@
             updateBtn();
         });
 
-        updateBtn();
 
         document.addEventListener('keydown', function (event) {
         const active = document.activeElement;
@@ -161,7 +160,15 @@
             const nextBtn = document.querySelector('.btn-nav:not(.disabled)[href*="page={{ page + 1 }}"]');
             if (nextBtn) nextBtn.click();
         }
+
+        if (event.altKey && event.code === 'KeyZ') {
+                event.preventDefault();
+                wrapToggleBtn.click();
+            }
+
         });
+
+
 
         const pageNavButtons = document.querySelectorAll('.btn-nav');
         pageNavButtons.forEach(button => {
@@ -169,6 +176,7 @@
                 sessionStorage.setItem('scrollPosition', window.scrollY);
             });
         });
+
         document.addEventListener('DOMContentLoaded', function() {
             const savedPosition = sessionStorage.getItem('scrollPosition');
             if (savedPosition) {
@@ -192,6 +200,7 @@
                 sessionStorage.removeItem('isJsonWrapped');
             });
         }
+        updateBtn();
     </script>
 </body>
 </html>
