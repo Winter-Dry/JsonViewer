@@ -3,6 +3,7 @@ import uuid
 import json
 import threading
 import time
+import shutil
 from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Request, UploadFile, File
@@ -14,6 +15,8 @@ app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key='your_secret_key')
 
 UPLOAD_FOLDER = 'uploads'
+if os.path.exists(UPLOAD_FOLDER):
+    shutil.rmtree(UPLOAD_FOLDER)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 templates = Jinja2Templates(directory="templates")

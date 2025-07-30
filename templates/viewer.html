@@ -168,21 +168,23 @@
 
         });
 
-
-
         const pageNavButtons = document.querySelectorAll('.btn-nav');
         pageNavButtons.forEach(button => {
             button.addEventListener('click', function() {
-                sessionStorage.setItem('scrollPosition', window.scrollY);
+                    const scrollY = window.scrollY;
+                    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+                    const ratio = docHeight > 0 ? scrollY / docHeight : 0;
+                    sessionStorage.setItem('scrollRatio', ratio);
             });
         });
 
         document.addEventListener('DOMContentLoaded', function() {
-            const savedPosition = sessionStorage.getItem('scrollPosition');
-            if (savedPosition) {
-<!--                window.scrollTo(0, parseInt(savedPosition, 10));-->
+            const savedRatio = sessionStorage.getItem('scrollRatio');
+            if (savedRatio !== null) {
+                const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+                const targetY = docHeight > 0 ? Math.round(docHeight * parseFloat(savedRatio)) : 0;
                 window.scrollTo({
-                    top: parseInt(savedPosition, 10),
+                    top: targetY,
                     behavior: 'instant'
                 });
             }
