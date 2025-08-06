@@ -125,6 +125,33 @@
         const jsonCode = document.getElementById('jsonCode');
         let isWrapped = false;
 
+        function linkifyJsonUrls() {
+            // 正则表达式，用于匹配完整的 URL 字符串。
+            // 它要求字符串以 http:// 或 https:// 开头。
+            const urlRegex = /^"https?:\/\/[^\s"]+"$/;
+            // Prism.js 会给所有 JSON 字符串值加上 .token.string 的 class
+            const stringElements = document.querySelectorAll('#jsonCodeInner .token.string');
+            stringElements.forEach(span => {
+                const text = span.textContent;
+                if (urlRegex.test(text)) {
+                    // 移掉字符串两边的引号 "
+                    const url = text.substring(1, text.length - 1);
+                    // 创建一个新的 <a> 标签
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.target = '_blank'; // 在新窗口中打开
+                    link.rel = 'noopener noreferrer'; // 安全性考虑
+                    link.textContent = text; // 链接的文本仍然显示带引号的完整 URL 字符串
+                    // 为了让链接样式和代码高亮风格一致，我们继承父元素的颜色
+                    link.style.color = 'inherit';
+                    link.style.textDecoration = 'underline'; // 添加下划线以示可点击
+                    // 清空原来的 span 内容，并把新的 <a> 标签放进去
+                    span.innerHTML = '';
+                    span.appendChild(link);
+                }
+            });
+        }
+
         function updateBtn() {
             if (isWrapped) {
                 wrapToggleBtn.innerHTML = '<i class="bi bi-text-nowrap"></i> Warp off';
@@ -193,6 +220,7 @@
                 isWrapped = true;
                 updateBtn();
             }
+            linkifyJsonUrls();
         });
 
         const returnBtn = document.querySelector('a[href="/"]');
