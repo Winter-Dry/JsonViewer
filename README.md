@@ -13,6 +13,7 @@ bash run.sh
 # Usage
 keyboard shortcut:
 - `Option + Z (Alt + Z)`: Soft Warp
+- `Option + X (Alt + X)`: Unescape Strings
 - `←`: Move to the previous line
 - `→`: Move to the next line
 
