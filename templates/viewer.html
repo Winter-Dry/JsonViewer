@@ -106,14 +106,14 @@
             </div>
         </div>
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <a href="/viewer?page={{ page - 1 }}" class="btn btn-outline-secondary btn-nav {% if page == 1 %}disabled{% endif %}">
+            <a href="/viewer?file_id={{ file_id }}&page={{ page - 1 }}" class="btn btn-outline-secondary btn-nav {% if page == 1 %}disabled{% endif %}">
                 <i class="bi bi-arrow-left"></i> Previous
             </a>
             <span class="page-indicator">
                 <i class="bi bi-list-ol"></i>
                 Page {{ page }} / {{ total }} Total
             </span>
-            <a href="/viewer?page={{ page + 1 }}" class="btn btn-outline-secondary btn-nav {% if page == total %}disabled{% endif %}">
+            <a href="/viewer?file_id={{ file_id }}&page={{ page + 1 }}" class="btn btn-outline-secondary btn-nav {% if page == total %}disabled{% endif %}">
                 Next <i class="bi bi-arrow-right"></i>
             </a>
         </div>
@@ -137,12 +137,6 @@
         let isWrapped = false;
         let isUnescaped = false;
 
-        /**
-         * 遍历所有由 Prism.js 标记的字符串 span，
-         * 并将它们最原始的文本内容存储在 data-original-text 属性中。
-         * 这一步至关重要，因为它为我们提供了一个“干净”的数据源，
-         * 无论后续进行多少次“转义/反转义”切换，我们总能恢复到最初的状态。
-         */
         function storeOriginalStringValues() {
             const stringElements = jsonCodeInner.querySelectorAll('.token.string');
             stringElements.forEach(span => {
@@ -150,16 +144,12 @@
             });
         }
 
-        /**
-         * 将 JSON 字符串中的 URL 转换为可点击的 <a> 标签。
-         * 这个函数现在会在每次显示更新后调用，以确保链接在两种模式下都有效。
-         */
+
         function linkifyJsonUrls() {
             const urlRegex = /^"https?:\/\/[^\s"]+"$/;
             const stringElements = jsonCodeInner.querySelectorAll('.token.string');
 
             stringElements.forEach(span => {
-                // 如果 span 内部已经有其他元素（比如之前创建的 <a> 标签），就跳过它。
                 if (span.children.length > 0) return;
 
                 const text = span.textContent;
@@ -178,39 +168,26 @@
             });
         }
 
-        /**
-         * 核心功能：根据 isUnescaped 状态切换字符串的显示。
-         * true:  将字符串内容进行 JSON 解析，显示 \n 为换行符等。
-         * false: 恢复为 data-original-text 中存储的原始带 \\n 的文本。
-         */
         function applyEscapeTransformation() {
             const stringElements = jsonCodeInner.querySelectorAll('.token.string');
             stringElements.forEach(span => {
                 const originalText = span.dataset.originalText;
-                if (!originalText) return; // 如果没有原始文本，则跳过
+                if (!originalText) return;
 
                 if (isUnescaped) {
                     try {
-                        // 使用 JSON.parse 来正确处理所有转义序列 (\n, \t, \", \\, \uXXXX 等)
-                        // originalText 是一个带引号的JSON字符串，如 `"hello\\nworld"`
                         const unescapedString = JSON.parse(originalText);
-                        // 我们需要把引号加回去，因为 Prism 的 .string token 代表整个带引号的部分
                         span.textContent = '"' + unescapedString + '"';
                     } catch (e) {
-                        // 如果解析失败（例如，字符串格式不正确），则保持原样，避免页面崩溃
                         span.textContent = originalText;
                         console.warn('Failed to parse JSON string:', originalText, e);
                     }
                 } else {
-                    // 恢复到最原始的文本
                     span.textContent = originalText;
                 }
             });
         }
 
-        /**
-         * 更新“自动换行”按钮的文本、图标和样式。
-         */
         function updateWrapBtn() {
             if (isWrapped) {
                 wrapToggleBtn.innerHTML = '<i class="bi bi-text-nowrap"></i> No Wrap';
@@ -222,9 +199,6 @@
             jsonCode.classList.toggle('wrap', isWrapped);
         }
 
-        /**
-         * 更新“反转义字符串”按钮的文本、图标和样式。
-         */
         function updateUnescapeBtn() {
             if (isUnescaped) {
                 unescapeToggleBtn.innerHTML = '<i class="bi bi-quote"></i> Show Escaped';
@@ -235,16 +209,10 @@
             }
         }
 
-        /**
-         * 一个统一的函数，用于在状态改变后刷新整个 JSON 显示区域。
-         * 它会先应用转义变换，然后再处理 URL 链接。顺序很重要。
-         */
         function updateJsonDisplay() {
             applyEscapeTransformation();
             linkifyJsonUrls();
         }
-
-        // --- Event Listeners ---
 
         wrapToggleBtn.addEventListener('click', function () {
             isWrapped = !isWrapped;

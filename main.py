@@ -58,14 +58,6 @@ def run_cleanup_scheduler():
         cleanup_old_files()
         time.sleep(3600)
 
-def get_user_file(request: Request):
-    file_id = request.session.get('file_id')
-    filename = request.session.get('filename')
-    if not file_id or not filename:
-        return None, None
-    filepath = os.path.join(UPLOAD_FOLDER, f"{file_id}_{filename}")
-    return filepath, file_id
-
 def build_line_index(filepath):
     index = []
     offset = 0
@@ -94,14 +86,17 @@ async def index(request: Request):
 @app.post("/", response_class=HTMLResponse)
 async def upload_file(request: Request, file: UploadFile = File(...)):
     contents = await file.read()
-    file_id = str(uuid.uuid4())
     filename = file.filename
-    filepath = os.path.join(UPLOAD_FOLDER, f"{file_id}_{filename}")
+
+    file_id = str(uuid.uuid4())
+    filepath = os.path.join(UPLOAD_FOLDER, f"{file_id}")
+    while os.path.exists(filepath):
+        file_id = str(uuid.uuid4())
+        filepath = os.path.join(UPLOAD_FOLDER, f"{file_id}")
+
     with open(filepath, "wb") as f:
         f.write(contents)
 
-    request.session['file_id'] = file_id
-    request.session['filename'] = filename
     with metadata_lock:
         file_metadata[file_id] = {
             'filename': filename,
@@ -109,11 +104,11 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         }
         if file_id in line_index_cache:
             del line_index_cache[file_id]
-    return RedirectResponse(url="/viewer?page=1", status_code=303)
+    return RedirectResponse(url=f"/viewer?file_id={file_id}&page=1", status_code=303)
 
 @app.get("/viewer", response_class=HTMLResponse)
-async def viewer(request: Request, page: int = 1):
-    filepath, file_id = get_user_file(request)
+async def viewer(request: Request, file_id: str, page: int = 1):
+    filepath = os.path.join(UPLOAD_FOLDER, f"{file_id}")
     if not filepath or not os.path.exists(filepath):
         return RedirectResponse(url="/", status_code=303)
     with metadata_lock:
@@ -142,6 +137,7 @@ async def viewer(request: Request, page: int = 1):
     return templates.TemplateResponse("viewer.html", {
         "request": request,
         "data": json.dumps(data, ensure_ascii=False, indent=4),
+        "file_id": file_id,
         "page": page,
         "total": total
     })
