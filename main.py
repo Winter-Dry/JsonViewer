@@ -4,6 +4,7 @@ import json
 import threading
 import time
 import shutil
+import random
 from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Request, UploadFile, File
@@ -28,7 +29,7 @@ file_metadata = {} # file_id -> {'filename': str, 'last_access': datetime}
 # Global cache：file_id -> line index
 line_index_cache = {}
 
-def cleanup_old_files(hour_thr=10):
+def cleanup_old_files(hour_thr=24):
     """
     clean outdated files from the upload folder.
     """
@@ -65,6 +66,7 @@ def build_line_index(filepath):
         for line in f:
             index.append(offset)
             offset += len(line.encode('utf-8'))
+    # random.shuffle(index)
     return index
 
 def read_line_by_index(filepath, index, line_no):

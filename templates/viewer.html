@@ -39,7 +39,6 @@
             tab-size: 2;
             -moz-tab-size: 2;
         }
-        /* Change line */
         .prism-code.wrap,
         .prism-code.wrap code {
             white-space: pre-wrap !important;
@@ -74,11 +73,54 @@
             text-decoration: underline;
         }
         .toggle-btn {
-            min-width: 150px; /* 增加了按钮宽度以容纳更长的文本 */
+            min-width: 150px;
         }
         html {
-        scroll-behavior: auto !important;
-    }
+            scroll-behavior: auto !important;
+        }
+
+        /* --- NEW: Styles for JSON folding --- */
+        .collapser {
+            cursor: pointer;
+            display: inline-block;
+            width: 1em;
+            text-align: center;
+            margin-right: 4px;
+            user-select: none;
+            color: #a0a0a0;
+            transition: transform 0.1s ease-in-out;
+        }
+        .collapser::before {
+            content: '▼'; /* Expanded state */
+        }
+        .collapsed > .collapser::before {
+            content: '▶'; /* Collapsed state */
+            transform: translateY(-1px);
+        }
+        .collapsible-content {
+            display: inline;
+        }
+        .collapsed > .collapsible-content {
+            display: none;
+        }
+        .ellipsis {
+            display: none;
+            color: #aaa;
+            background-color: #3a3c4a;
+            padding: 0 5px;
+            border-radius: 3px;
+            margin: 0 5px;
+            font-style: italic;
+            cursor: pointer;
+        }
+        .collapsed > .ellipsis {
+            display: inline;
+        }
+        .collapsible {
+            display: contents; /* Use 'contents' to not affect layout */
+        }
+        /* --- END: New Styles --- */
+
     </style>
 </head>
 <body>
@@ -86,8 +128,15 @@
         <div class="json-header d-flex align-items-center mb-3">
             <i class="bi bi-braces-asterisk fs-3 me-2 text-primary"></i>
             <h3 class="mb-0">JSON Browser</h3>
-            <div class="ms-auto">
-                <!-- NEW: Unescape Strings Button -->
+            <div class="ms-auto d-flex flex-wrap gap-2 justify-content-end">
+                <!-- NEW: Collapse/Expand All Buttons -->
+                <button id="collapseAllBtn" type="button" class="btn btn-outline-secondary btn-sm" title="Collapse All">
+                    <i class="bi bi-arrows-collapse"></i> Collapse All
+                </button>
+                <button id="expandAllBtn" type="button" class="btn btn-outline-secondary btn-sm" title="Expand All">
+                    <i class="bi bi-arrows-expand"></i> Expand All
+                </button>
+                <!-- Unescape Strings Button -->
                 <button id="unescapeToggleBtn" type="button" class="btn btn-outline-primary btn-sm toggle-btn" title="Unescape Strings (Alt+X)">
                     <i class="bi bi-magic"></i> Unescape Strings
                 </button>
@@ -132,27 +181,136 @@
         const unescapeToggleBtn = document.getElementById('unescapeToggleBtn');
         const jsonCode = document.getElementById('jsonCode');
         const jsonCodeInner = document.getElementById('jsonCodeInner');
+        // NEW: Folding buttons
+        const collapseAllBtn = document.getElementById('collapseAllBtn');
+        const expandAllBtn = document.getElementById('expandAllBtn');
 
         // --- State Variables ---
         let isWrapped = false;
         let isUnescaped = false;
 
+        // --- NEW: JSON Folding Logic ---
+
+        /**
+         * Finds the matching bracket for a given starting bracket node.
+         * @param {Node[]} nodes - The list of sibling nodes to search within.
+         * @param {number} startIndex - The index of the opening bracket.
+         * @returns {number} - The index of the matching closing bracket, or -1 if not found.
+         */
+        function findMatchingBracket(nodes, startIndex) {
+            const openChar = nodes[startIndex].textContent.trim();
+            const closeChar = { '{': '}', '[': ']' }[openChar];
+            let depth = 1;
+
+            for (let i = startIndex + 1; i < nodes.length; i++) {
+                const text = nodes[i].textContent.trim();
+                if (text === openChar) {
+                    depth++;
+                } else if (text === closeChar) {
+                    depth--;
+                    if (depth === 0) {
+                        return i;
+                    }
+                }
+            }
+            return -1; // Not found
+        }
+
+        /**
+         * Recursively processes nodes to make JSON parts foldable.
+         * @param {HTMLElement} parentElement - The element whose child nodes will be processed.
+         */
+        function makeJsonFoldable(parentElement) {
+            const nodes = Array.from(parentElement.childNodes);
+            let i = 0;
+            while (i < nodes.length) {
+                const node = nodes[i];
+
+                // Check if it's a punctuation token for '{' or '['
+                if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('token') && node.classList.contains('punctuation') && (node.textContent === '{' || node.textContent === '[')) {
+
+                    const endIndex = findMatchingBracket(nodes, i);
+
+                    if (endIndex !== -1) {
+                        // Create a container for the collapsible section
+                        const collapsibleContainer = document.createElement('span');
+                        collapsibleContainer.className = 'collapsible';
+
+                        // Create the collapser toggle button
+                        const collapser = document.createElement('span');
+                        collapser.className = 'collapser';
+
+                        // Create the content wrapper
+                        const contentWrapper = document.createElement('span');
+                        contentWrapper.className = 'collapsible-content';
+
+                        // Move the content nodes into the wrapper
+                        const contentNodes = nodes.slice(i + 1, endIndex);
+                        contentNodes.forEach(contentNode => contentWrapper.appendChild(contentNode.cloneNode(true)));
+
+                        // Count items for the ellipsis
+                        const isObject = node.textContent === '{';
+                        const itemCount = isObject
+                            ? contentWrapper.querySelectorAll('.token.property').length
+                            : (contentWrapper.textContent.trim() ? contentWrapper.textContent.trim().split(',').length : 0);
+
+                        // Create the ellipsis
+                        const ellipsis = document.createElement('span');
+                        ellipsis.className = 'ellipsis';
+                        ellipsis.textContent = `... ${itemCount} ${isObject ? 'keys' : 'items'} ...`;
+
+                        // Assemble the new structure
+                        collapsibleContainer.appendChild(collapser);
+                        collapsibleContainer.appendChild(node.cloneNode(true)); // open bracket
+                        collapsibleContainer.appendChild(ellipsis);
+                        collapsibleContainer.appendChild(contentWrapper);
+                        collapsibleContainer.appendChild(nodes[endIndex].cloneNode(true)); // close bracket
+
+                        // Add click event to toggle
+                        const toggleCollapse = () => collapsibleContainer.classList.toggle('collapsed');
+                        collapser.addEventListener('click', toggleCollapse);
+                        ellipsis.addEventListener('click', toggleCollapse);
+
+                        // Recursively make the inner content foldable
+                        makeJsonFoldable(contentWrapper);
+
+                        // Replace the original nodes with the new collapsible structure
+                        const nodesToRemove = nodes.slice(i, endIndex + 1);
+                        parentElement.replaceChild(collapsibleContainer, nodesToRemove[0]);
+                        nodesToRemove.slice(1).forEach(n => n.remove());
+
+                        // Update nodes array and index for the next iteration
+                        // This is a bit complex, so we re-fetch the nodes.
+                        // A more performant way would be to adjust index, but this is more robust.
+                        return makeJsonFoldable(parentElement); // Restart processing from the parent
+                    }
+                }
+                i++;
+            }
+        }
+
+        // --- END: JSON Folding Logic ---
+
+
         function storeOriginalStringValues() {
             const stringElements = jsonCodeInner.querySelectorAll('.token.string');
             stringElements.forEach(span => {
-                span.dataset.originalText = span.textContent;
+                if (!span.dataset.originalText) { // Store only if not already stored
+                    span.dataset.originalText = span.textContent;
+                }
             });
         }
-
 
         function linkifyJsonUrls() {
             const urlRegex = /^"https?:\/\/[^\s"]+"$/;
             const stringElements = jsonCodeInner.querySelectorAll('.token.string');
 
             stringElements.forEach(span => {
-                if (span.children.length > 0) return;
+                // If it already contains a link, skip it
+                if (span.querySelector('a')) return;
 
-                const text = span.textContent;
+                const text = isUnescaped ? ('"' + JSON.parse(span.dataset.originalText) + '"') : span.dataset.originalText;
+
                 if (urlRegex.test(text)) {
                     const url = text.substring(1, text.length - 1);
                     const link = document.createElement('a');
@@ -162,6 +320,8 @@
                     link.textContent = text;
                     link.style.color = 'inherit';
                     link.style.textDecoration = 'underline';
+
+                    // Clear the span and append the link
                     span.innerHTML = '';
                     span.appendChild(link);
                 }
@@ -174,16 +334,18 @@
                 const originalText = span.dataset.originalText;
                 if (!originalText) return;
 
+                const targetElement = span.querySelector('a') || span;
+
                 if (isUnescaped) {
                     try {
                         const unescapedString = JSON.parse(originalText);
-                        span.textContent = '"' + unescapedString + '"';
+                        targetElement.textContent = '"' + unescapedString + '"';
                     } catch (e) {
-                        span.textContent = originalText;
+                        targetElement.textContent = originalText;
                         console.warn('Failed to parse JSON string:', originalText, e);
                     }
                 } else {
-                    span.textContent = originalText;
+                    targetElement.textContent = originalText;
                 }
             });
         }
@@ -211,7 +373,7 @@
 
         function updateJsonDisplay() {
             applyEscapeTransformation();
-            linkifyJsonUrls();
+            linkifyJsonUrls(); // Re-apply linkify after potential text changes
         }
 
         wrapToggleBtn.addEventListener('click', function () {
@@ -227,27 +389,33 @@
             updateJsonDisplay();
         });
 
+        // NEW: Event listeners for collapse/expand all
+        collapseAllBtn.addEventListener('click', () => {
+            jsonCodeInner.querySelectorAll('.collapsible').forEach(el => el.classList.add('collapsed'));
+        });
+
+        expandAllBtn.addEventListener('click', () => {
+            jsonCodeInner.querySelectorAll('.collapsible').forEach(el => el.classList.remove('collapsed'));
+        });
+
+
         document.addEventListener('keydown', function (event) {
             const active = document.activeElement;
             if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
                 return;
             }
-            // ← Previous page
             if (event.key === 'ArrowLeft') {
                 const prevBtn = document.querySelector('.btn-nav:not(.disabled)[href*="page={{ page - 1 }}"]');
                 if (prevBtn) prevBtn.click();
             }
-            // → Next page
             if (event.key === 'ArrowRight') {
                 const nextBtn = document.querySelector('.btn-nav:not(.disabled)[href*="page={{ page + 1 }}"]');
                 if (nextBtn) nextBtn.click();
             }
-            // Alt + Z for Soft Wraps
             if (event.altKey && event.code === 'KeyZ') {
                 event.preventDefault();
                 wrapToggleBtn.click();
             }
-            // Alt + X for Unescape Strings
             if (event.altKey && event.code === 'KeyX') {
                 event.preventDefault();
                 unescapeToggleBtn.click();
@@ -266,39 +434,54 @@
 
         // --- Page Initialization ---
         document.addEventListener('DOMContentLoaded', function() {
-            storeOriginalStringValues();
+            // IMPORTANT: Explicitly highlight first, as the folding logic depends on Prism's output.
+            Prism.highlightElement(jsonCodeInner, false, function() {
 
-            const savedWrapState = sessionStorage.getItem('isJsonWrapped');
-            if (savedWrapState === 'true') {
-                isWrapped = true;
-            }
+                // 1. Make the JSON foldable
+                makeJsonFoldable(jsonCodeInner);
 
-            const savedUnescapeState = sessionStorage.getItem('isJsonUnescaped');
-            if (savedUnescapeState === 'true') {
-                isUnescaped = true;
-            }
+                // 2. Store original string values for unescaping
+                storeOriginalStringValues();
 
-            updateWrapBtn();
-            updateUnescapeBtn();
-            updateJsonDisplay();
+                // 3. Load saved states
+                const savedWrapState = sessionStorage.getItem('isJsonWrapped');
+                if (savedWrapState === 'true') {
+                    isWrapped = true;
+                }
 
-            const savedRatio = sessionStorage.getItem('scrollRatio');
-            if (savedRatio !== null) {
-                const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-                const targetY = docHeight > 0 ? Math.round(docHeight * parseFloat(savedRatio)) : 0;
-                window.scrollTo({
-                    top: targetY,
-                    behavior: 'instant'
-                });
-            }
+                const savedUnescapeState = sessionStorage.getItem('isJsonUnescaped');
+                if (savedUnescapeState === 'true') {
+                    isUnescaped = true;
+                }
+
+                // 4. Update UI based on states
+                updateWrapBtn();
+                updateUnescapeBtn();
+                updateJsonDisplay();
+
+                // 5. Restore scroll position
+                const savedRatio = sessionStorage.getItem('scrollRatio');
+                if (savedRatio !== null) {
+                    // Use a small timeout to allow the DOM to fully render after folding logic
+                    setTimeout(() => {
+                        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+                        const targetY = docHeight > 0 ? Math.round(docHeight * parseFloat(savedRatio)) : 0;
+                        window.scrollTo({
+                            top: targetY,
+                            behavior: 'instant'
+                        });
+                    }, 50);
+                }
+            });
         });
 
         const returnBtn = document.querySelector('a[href="/"]');
         if (returnBtn) {
             returnBtn.addEventListener('click', function() {
-                 sessionStorage.removeItem('isJsonWrapped');
-                 sessionStorage.removeItem('isJsonUnescaped');
-                 sessionStorage.removeItem('scrollRatio');
+                // Clear session storage on return to have a fresh start
+                sessionStorage.removeItem('isJsonWrapped');
+                sessionStorage.removeItem('isJsonUnescaped');
+                sessionStorage.removeItem('scrollRatio');
             });
         }
     </script>
