@@ -91,11 +91,16 @@
             transition: transform 0.1s ease-in-out;
         }
         .collapser::before {
-            content: '▼'; /* Expanded state */
+            content: '⊝'; /* Expanded state */
+            font-size: 1.5em;
+            color: #3498db;
+            display: inline-block;
+            vertical-align: middle;
         }
         .collapsed > .collapser::before {
-            content: '▶'; /* Collapsed state */
+            content: '⊕'; /* Collapsed state */
             transform: translateY(-1px);
+            color: #7F5CC8;
         }
         .collapsible-content {
             display: inline;
